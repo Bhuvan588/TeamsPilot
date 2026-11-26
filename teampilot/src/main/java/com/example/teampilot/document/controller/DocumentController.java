@@ -1,15 +1,10 @@
 package com.example.teampilot.document.controller;
 
-import com.example.teampilot.document.chunking.DocumentChunkingService;
+
 import com.example.teampilot.document.embedding.model.EmbeddedChunk;
 import com.example.teampilot.document.embedding.service.DocumentEmbeddingService;
-import com.example.teampilot.document.model.DocumentChunk;
-import com.example.teampilot.document.model.DocumentSearchResult;
-import com.example.teampilot.document.model.ExtractedDocument;
-import com.example.teampilot.document.service.DocumentIngestionService;
-import com.example.teampilot.document.service.DocumentRagService;
-import com.example.teampilot.document.service.DocumentSearchService;
-import com.example.teampilot.document.service.DocumentVectorStoreService;
+import com.example.teampilot.document.model.*;
+import com.example.teampilot.document.service.*;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -29,6 +24,8 @@ public class DocumentController {
     private final DocumentVectorStoreService vectorStoreService;
     private final DocumentSearchService searchService;
     private final DocumentRagService ragService;
+    private final DocumentKeywordSearchService keywordSearchService;
+    private final HybridSearchService hybridSearchService;
 
 
     public DocumentController(
@@ -36,13 +33,17 @@ public class DocumentController {
             DocumentEmbeddingService embeddingService,
             DocumentVectorStoreService vectorStoreService,
             DocumentSearchService searchService,
-            DocumentRagService ragService) {
+            DocumentRagService ragService,
+            DocumentKeywordSearchService keywordSearchService,
+            HybridSearchService hybridSearchService) {
         this.ingestionService = ingestionService;
         this.chunkingService = chunkingService;
         this.embeddingService = embeddingService;
         this.vectorStoreService=vectorStoreService;
         this.searchService=searchService;
         this.ragService=ragService;
+        this.keywordSearchService=keywordSearchService;
+        this.hybridSearchService=hybridSearchService;
 
     }
 
@@ -68,7 +69,7 @@ public class DocumentController {
                 ingestionService.ingest(file);
 
         return chunkingService.chunk(
-                extracted.extractedText()
+                extracted
         );
     }
 
@@ -86,7 +87,7 @@ public class DocumentController {
 
         // Step 2: Split text into chunks
         List<DocumentChunk> chunks =
-                chunkingService.chunk(extracted.extractedText());
+                chunkingService.chunk(extracted);
 
         // Step 3: Generate embeddings
         return embeddingService.generateEmbeddings(chunks);
@@ -103,7 +104,7 @@ public class DocumentController {
         // Step 2: Split into chunks
         List<DocumentChunk> chunks =
                 chunkingService.chunk(
-                        extracted.extractedText()
+                        extracted
                 );
 
         // Step 3: Generate a unique ID for this upload
@@ -140,13 +141,29 @@ public class DocumentController {
 
     //final RAG endpoint
     @GetMapping("/ask")
-    public ResponseEntity<Map<String, String>> askQuestion(
+    public ResponseEntity<RagResponse> askQuestion(
             @RequestParam String question) {
 
-        String answer = ragService.answerQuestion(question);
+        RagResponse response =
+                ragService.answerQuestion(question);
 
-        return ResponseEntity.ok(
-                Map.of("question", question, "answer", answer)
-        );
+        return ResponseEntity.ok(response);
+    }
+
+    //for keyword search
+    @GetMapping("/keyword-search")
+    public List<KeywordSearchResult> keywordSearch(
+            @RequestParam String query,
+            @RequestParam(defaultValue = "5") int topK) {
+
+        return keywordSearchService.search(query, topK);
+    }
+
+    @GetMapping("/hybrid-search")
+    public List<HybridSearchResult> hybridSearch(
+            @RequestParam String query,
+            @RequestParam(defaultValue = "5") int topK) {
+
+        return hybridSearchService.search(query, topK);
     }
 }

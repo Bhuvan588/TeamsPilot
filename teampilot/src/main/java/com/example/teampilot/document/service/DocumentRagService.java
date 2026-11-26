@@ -1,6 +1,8 @@
 
 package com.example.teampilot.document.service;
 
+import com.example.teampilot.document.model.HybridSearchResult;
+import com.example.teampilot.document.model.RagResponse;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -8,6 +10,7 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -15,37 +18,40 @@ public class DocumentRagService {
 
     private final VectorStore vectorStore;
     private final ChatClient chatClient;
+    private final HybridSearchService hybridSearchService;
 
     public DocumentRagService(
             VectorStore vectorStore,
-            ChatClient chatClient) {
+            ChatClient chatClient, HybridSearchService hybridSearchService) {
 
         this.vectorStore = vectorStore;
         this.chatClient = chatClient;
+        this.hybridSearchService = hybridSearchService;
     }
 
-    public String answerQuestion(String question) {
+    public RagResponse answerQuestion(String question) {
 
         // 1. Retrieve relevant chunks
-        SearchRequest searchRequest = SearchRequest.builder()
-                .query(question)
-                .topK(3)
-                .build();
+        List<HybridSearchResult> retrievedChunks =
+                hybridSearchService.search(question, 3);
 
-        List<Document> retrievedDocuments =
-                vectorStore.similaritySearch(searchRequest);
+        if (retrievedChunks == null ||
+                retrievedChunks.isEmpty()) {
 
-        if (retrievedDocuments == null || retrievedDocuments.isEmpty()) {
-            return "I couldn't find relevant information in the uploaded documents.";
+            return new RagResponse(
+                    question,
+                    "I couldn't find relevant information in the uploaded documents.",
+                    List.of()
+            );
         }
 
-        // 2. Build context from retrieved chunks
-        String context = retrievedDocuments.stream()
-                .map(Document::getText)
+        // 2. Build context
+        String context = retrievedChunks.stream()
+                .map(HybridSearchResult::content)
                 .collect(Collectors.joining("\n\n"));
 
-        // 3. Construct prompt and generate answer
-        return chatClient.prompt()
+        // 3. Generate answer
+        String answer = chatClient.prompt()
                 .system("""
                         You are TeamPilot, an enterprise document assistant.
 
@@ -68,5 +74,23 @@ public class DocumentRagService {
                         """.formatted(context, question))
                 .call()
                 .content();
+
+        // 4. Extract source information
+        List<RagResponse.SourceReference> sources =
+                retrievedChunks.stream()
+                        .map(chunk -> new RagResponse.SourceReference(
+                                chunk.filename(),
+                                chunk.documentId(),
+                                chunk.chunkIndex(),
+                                chunk.section(),
+                                chunk.rrfScore(),
+                                chunk.content().substring(
+                                        0,
+                                        Math.min(200, chunk.content().length())
+                                )
+                        ))
+                        .toList();
+
+        return new RagResponse(question, answer, sources);
     }
 }

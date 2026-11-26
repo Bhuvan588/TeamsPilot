@@ -28,7 +28,8 @@ public class DocumentVectorStoreService {
                         Map.of(
                                 "documentId", documentId,
                                 "filename", filename,
-                                "chunkIndex", chunk.chunkIndex()
+                                "chunkIndex", chunk.chunkIndex(),
+                                "section", chunk.section()==null ? "GENERAL" : chunk.section()
                         )
                 ))
                 .toList();
