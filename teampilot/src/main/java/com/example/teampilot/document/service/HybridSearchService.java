@@ -1,5 +1,6 @@
 package com.example.teampilot.document.service;
 
+import com.example.teampilot.document.model.DocumentSearchFilter;
 import com.example.teampilot.document.model.DocumentSearchResult;
 import com.example.teampilot.document.model.HybridSearchResult;
 import com.example.teampilot.document.model.KeywordSearchResult;
@@ -24,15 +25,23 @@ public class HybridSearchService {
         this.documentSearchService = documentSearchService;
         this.keywordSearchService = keywordSearchService;
     }
-
     public List<HybridSearchResult> search(String query, int topK) {
+        return search(query, topK, null);
+    }
+
+    public List<HybridSearchResult> search(
+            String query,
+            int topK,
+            DocumentSearchFilter filter) {
 
         // 1. Retrieve results from both search systems
+        // 1. Retrieve vector results
         List<DocumentSearchResult> vectorResults =
-                documentSearchService.search(query);
+                documentSearchService.search(query, topK, filter);
 
+// 2. Retrieve keyword results
         List<KeywordSearchResult> keywordResults =
-                keywordSearchService.search(query, topK);
+                keywordSearchService.search(query, topK, filter);
 
         // 2. Store and merge results using chunk UUID
         Map<String, ResultAccumulator> resultMap = new HashMap<>();

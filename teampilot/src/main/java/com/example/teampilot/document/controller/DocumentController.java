@@ -28,6 +28,7 @@ public class DocumentController {
     private final HybridSearchService hybridSearchService;
 
 
+
     public DocumentController(
             DocumentIngestionService ingestionService,DocumentChunkingService chunkingService,
             DocumentEmbeddingService embeddingService,
@@ -141,13 +142,20 @@ public class DocumentController {
 
     //final RAG endpoint
     @GetMapping("/ask")
-    public ResponseEntity<RagResponse> askQuestion(
-            @RequestParam String question) {
+    public RagResponse ask(
+            @RequestParam String question,
+            @RequestParam(required = false) String documentId,
+            @RequestParam(required = false) String section) {
 
-        RagResponse response =
-                ragService.answerQuestion(question);
+        DocumentSearchFilter filter = null;
 
-        return ResponseEntity.ok(response);
+        if ((documentId != null && !documentId.isBlank()) ||
+                (section != null && !section.isBlank())) {
+
+            filter = new DocumentSearchFilter(documentId, section);
+        }
+
+        return ragService.answerQuestion(question, filter);
     }
 
     //for keyword search
@@ -159,11 +167,40 @@ public class DocumentController {
         return keywordSearchService.search(query, topK);
     }
 
-    @GetMapping("/hybrid-search")
-    public List<HybridSearchResult> hybridSearch(
+    @GetMapping("/hybrid-search-filtered")
+    public List<HybridSearchResult> filteredHybridSearch(
             @RequestParam String query,
-            @RequestParam(defaultValue = "5") int topK) {
+            @RequestParam String documentId,
+            @RequestParam String section) {
 
-        return hybridSearchService.search(query, topK);
+        DocumentSearchFilter filter =
+                new DocumentSearchFilter(documentId, section);
+
+        return hybridSearchService.search(query, 5, filter);
+    }
+
+    //testing keyword search
+    @GetMapping("/keyword-search-filtered")
+    public List<KeywordSearchResult> filteredKeywordSearch(
+            @RequestParam String query,
+            @RequestParam String documentId,
+            @RequestParam String section) {
+
+        DocumentSearchFilter filter =
+                new DocumentSearchFilter(documentId, section);
+
+        return keywordSearchService.search(query, 5, filter);
+    }
+
+    @GetMapping("/search-filtered")
+    public List<DocumentSearchResult> filteredSearch(
+            @RequestParam String query,
+            @RequestParam String documentId,
+            @RequestParam String section) {
+
+        DocumentSearchFilter filter =
+                new DocumentSearchFilter(documentId, section);
+
+        return searchService.search(query, 5, filter);
     }
 }

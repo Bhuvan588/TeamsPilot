@@ -15,7 +15,7 @@ public record RagResponse(
             String documentId,
             Integer chunkIndex,
             String section,
-            Double distance,
+            Double rrfScore,
             String excerpt
-    ){}
+    ) {}
 }
