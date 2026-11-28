@@ -1,3 +1,4 @@
+
 package com.example.teampilot.document.service;
 
 import com.example.teampilot.document.model.DocumentSearchFilter;
@@ -25,28 +26,46 @@ public class HybridSearchService {
         this.documentSearchService = documentSearchService;
         this.keywordSearchService = keywordSearchService;
     }
+
     public List<HybridSearchResult> search(String query, int topK) {
-        return search(query, topK, null);
+        return search(query, topK, topK, null);
     }
 
     public List<HybridSearchResult> search(
             String query,
             int topK,
             DocumentSearchFilter filter) {
+        return search(query, topK, topK, filter);
+    }
 
-        // 1. Retrieve results from both search systems
-        // 1. Retrieve vector results
+    public List<HybridSearchResult> search(
+            String query,
+            int candidateK,
+            int topK,
+            DocumentSearchFilter filter) {
+
+        if (candidateK <= 0 || topK <= 0) {
+            throw new IllegalArgumentException(
+                    "candidateK and topK must be greater than zero");
+        }
+
+        if (candidateK < topK) {
+            throw new IllegalArgumentException(
+                    "candidateK cannot be smaller than topK");
+        }
+
+        // 1. Retrieve candidateK results from vector search
         List<DocumentSearchResult> vectorResults =
-                documentSearchService.search(query, topK, filter);
+                documentSearchService.search(query, candidateK, filter);
 
-// 2. Retrieve keyword results
+        // 2. Retrieve candidateK results from keyword search
         List<KeywordSearchResult> keywordResults =
-                keywordSearchService.search(query, topK, filter);
+                keywordSearchService.search(query, candidateK, filter);
 
-        // 2. Store and merge results using chunk UUID
+        // 3. Merge results using chunk UUID
         Map<String, ResultAccumulator> resultMap = new HashMap<>();
 
-        // 3. Process vector search results
+        // 4. Process vector search results
         for (int i = 0; i < vectorResults.size(); i++) {
 
             DocumentSearchResult result = vectorResults.get(i);
@@ -59,7 +78,7 @@ public class HybridSearchService {
             accumulator.addScore(i + 1);
         }
 
-        // 4. Process keyword search results
+        // 5. Process keyword search results
         for (int i = 0; i < keywordResults.size(); i++) {
 
             KeywordSearchResult result = keywordResults.get(i);
@@ -72,7 +91,7 @@ public class HybridSearchService {
             accumulator.addScore(i + 1);
         }
 
-        // 5. Sort by RRF score and return top K
+        // 6. Sort by RRF score and return final topK
         return resultMap.values()
                 .stream()
                 .map(ResultAccumulator::toResult)
@@ -163,7 +182,9 @@ public class HybridSearchService {
                 Map<String, Object> metadata, String key) {
 
             Object value = metadata.get(key);
-            return value == null ? null : Integer.valueOf(value.toString());
+            return value == null
+                    ? null
+                    : Integer.valueOf(value.toString());
         }
     }
 }

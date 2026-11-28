@@ -55,3 +55,8 @@ management:
   endpoint:
     health:
       show-details: always
+
+teampilot:
+  reranker:
+    base-url: http://localhost:8001
+    endpoint: /rerank

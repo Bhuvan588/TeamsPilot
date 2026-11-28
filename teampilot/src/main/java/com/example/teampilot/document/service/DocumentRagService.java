@@ -15,13 +15,15 @@ public class DocumentRagService {
 
     private final ChatClient chatClient;
     private final HybridSearchService hybridSearchService;
+    private final ChunkReranker chunkReranker;
 
     public DocumentRagService(
             ChatClient chatClient,
-            HybridSearchService hybridSearchService) {
+            HybridSearchService hybridSearchService, ChunkReranker chunkReranker) {
 
         this.chatClient = chatClient;
         this.hybridSearchService = hybridSearchService;
+        this.chunkReranker = chunkReranker;
     }
 
     // Existing unfiltered method
@@ -35,8 +37,13 @@ public class DocumentRagService {
             DocumentSearchFilter filter) {
 
         // 1. Retrieve relevant chunks using hybrid search
+        // Stage 1: Retrieve 20 candidates using hybrid search
+        List<HybridSearchResult> candidates =
+                hybridSearchService.search(question, 20, 20, filter);
+
+// Stage 2: Rerank candidates and retain the best 5
         List<HybridSearchResult> retrievedChunks =
-                hybridSearchService.search(question, 3, filter);
+                chunkReranker.rerank(question, candidates, 5);
 
         if (retrievedChunks == null || retrievedChunks.isEmpty()) {
 
